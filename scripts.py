@@ -48,7 +48,7 @@ class TelegramBotContainer:
         app = self.container.get('application')
         await app.initialize()
         await app.start()
-        await app.updater.start_polling()  # Для polling
+        await app.updater.start_polling()  #Для polling
         
         logger = self.container.get('logger')
         logger.info("Bot started!")

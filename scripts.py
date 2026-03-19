@@ -1,124 +1,108 @@
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
-import logging
+import os
+import sys
 import asyncio
-from typing import Any, Callable, Optional
+from pathlib import Path
+from datetime import datetime
 
-# Предполагаем, что класс Container существует
-# Если нет, добавим простую реализацию
-class Container:
-    def __init__(self):
-        self._services = {}
-        self._factories = {}
-    
-    def register(self, name: str, service: Any):
-        """Регистрация готового сервиса"""
-        self._services[name] = service
-    
-    def factory(self, name: str, factory_func: Callable):
-        """Регистрация фабрики"""
-        self._factories[name] = factory_func
-    
-    def get(self, name: str) -> Any:
-        """Получение сервиса"""
-        if name in self._services:
-            return self._services[name]
-        elif name in self._factories:
-            service = self._factories[name](self)
-            self._services[name] = service
-            return service
-        raise KeyError(f"Service '{name}' not found")
+# Импортируем утилиты из custom_expansion
+from cus_exp import MyFileFormat
 
-class TelegramBotContainer:
-    def __init__(self, token: str):
-        self.container = Container()
-        self.token = token
-        
-        # Регистрируем основные зависимости
-        self._register_core_services()
-        
-    def _register_core_services(self):
-        """Регистрация основных сервисов"""
-        self.container.factory('application', self._create_application)
-        
-        # Логгер
-        logging.basicConfig(level=logging.INFO)
-        self.container.register('logger', logging.getLogger(__name__))
-        
-    def _create_application(self, container: Container) -> Application:
-        """Фабрика для создания Application"""
-        return Application.builder().token(self.token).build()
-        
-    def register_handler(self, handler_type: str, callback: Callable, **kwargs):
-        """Регистрация обработчиков"""
-        app = self.container.get('application')
-        
-        if handler_type == 'command':
-            command = kwargs.get('command', 'start')
-            app.add_handler(CommandHandler(command, callback))
-        elif handler_type == 'message':
-            app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, callback))
-        elif handler_type == 'callback_query':
-            app.add_handler(CallbackQueryHandler(callback))
-            
-    def register_service(self, name: str, service: Any):
-        """Регистрация кастомного сервиса"""
-        self.container.register(name, service)
-        
-    def register_factory(self, name: str, factory_func: Callable):
-        """Регистрация фабрики"""
-        self.container.factory(name, factory_func)
-        
-    async def run(self):
-        """Запуск бота"""
-        app = self.container.get('application')
-        
-        # Инициализация и запуск
-        await app.initialize()
-        await app.start()
-        
-        # Запуск polling
-        await app.updater.start_polling()
-        
-        logger = self.container.get('logger')
-        logger.info("Bot started!")
-        
-        # Бесконечный цикл
-        try:
-            # Используем asyncio.sleep для бесконечного цикла
-            while True:
-                await asyncio.sleep(3600)  # Спим час
-        except asyncio.CancelledError:
-            # Корректное завершение при отмене
-            logger.info("Bot stopping...")
-            await app.updater.stop()
-            await app.stop()
-            await app.shutdown()
-        
-    def run_polling(self):
-        """Запуск в режиме polling"""
-        try:
-            asyncio.run(self.run())
-        except KeyboardInterrupt:
-            logger = self.container.get('logger')
-            logger.info("Bot stopped by user")
 
-# Пример использования:
-async def main():
-    # Создаем бота
-    bot = TelegramBotContainer("YOUR_TOKEN_HERE")
-    
-    # Регистрируем обработчики
-    async def start_command(update, context):
-        await update.message.reply_text("Hello!")
-    
-    async def echo_message(update, context):
-        await update.message.reply_text(update.message.text)
-    
-    bot.register_handler('command', start_command, command='start')
-    bot.register_handler('message', echo_message)
-    
-    # Запускаем
-    await bot.run()
+def test_file_format():
+    """Тестирование класса MyFileFormat"""
+    print("\n" + "="*50)
+    print("Тестирование MyFileFormat")
+    print("="*50)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    app = MyFileFormat(".mydata")
+
+    # Сохранение данных
+    my_data = {
+        "name": "Мой проект",
+        "version": 1.0,
+        "items": [1, 2, 3, 4, 5],
+        "created": datetime.now().isoformat()
+    }
+
+    filename = app.save_data(my_data, "project_test")
+    print(f"Данные сохранены в {filename}")
+
+    # Загрузка данных
+    loaded_data = app.load_data("project_test.mydata")
+    print("Загруженные данные:", loaded_data)
+
+    return loaded_data
+
+
+def check_environment():
+    """Проверка окружения перед запуском бота"""
+    print("🔍 Проверка окружения...")
+
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not token:
+        print("❌ Токен бота не найден в переменных окружения!")
+        print("   Установите переменную TELEGRAM_BOT_TOKEN или укажите токен в коде")
+        return None
+
+    print("✅ Токен найден")
+
+    Path("./vcs_data").mkdir(exist_ok=True)
+    Path("./vcs_data/files").mkdir(exist_ok=True)
+    print("✅ Директории созданы")
+
+    return token
+
+
+def show_info():
+    """Показать информацию о системе"""
+    print("\n" + "="*50)
+    print("📊 ИНФОРМАЦИЯ О СИСТЕМЕ")
+    print("="*50)
+    print("\nКоманды бота:")
+    print("  /start - Приветственное сообщение")
+    print("  /vcs_commit <filepath> <description> - Сохранить версию файла")
+    print("  /vcs_history <filepath> [limit] - Показать историю версий")
+    print("  /vcs_checkout <filepath> <version> - Переключиться на версию")
+    print("  /vcs_branch create <filepath> <branch> [from] - Создать ветку")
+    print("  /vcs_branch list <filepath> - Показать ветки")
+    print("  /vcs_diff <filepath> <ver1> <ver2> - Сравнить версии")
+    print("  /vcs_help - Показать справку")
+
+    print("\n📁 Структура директорий:")
+    print("  ./vcs_data/ - Хранилище данных контроля версий")
+    print("  ./vcs_data/files/ - Файлы версий")
+    print("  ./vcs_data/index.json - Индекс всех файлов")
+
+    print("\n🔧 Классы системы:")
+    print("  • TelegramBotContainer - Контейнер для бота")
+    print("  • VersionControlService - Сервис контроля версий")
+    print("  • VersionControlBotExtension - Расширение для бота")
+    print("  • MyFileFormat - Работа с кастомными файлами")
+
+    input("\nНажмите Enter для продолжения...")
+
+
+def interactive_menu():
+    """Интерактивное меню для выбора режима запуска"""
+    print("\n" + "="*50)
+    print("🤖 TELEGRAM БОТ С КОНТРОЛЕМ ВЕРСИЙ")
+    print("="*50)
+    print("\nВыберите режим запуска:")
+    print("  1. Запустить Telegram бота")
+    print("  2. Протестировать MyFileFormat")
+    print("  3. Показать информацию о системе")
+    print("  4. Выход")
+
+    choice = input("\nВаш выбор (1-4): ").strip()
+
+    if choice == "1":
+        return "run_bot"
+    elif choice == "2":
+        return "test_format"
+    elif choice == "3":
+        return "info"
+    elif choice == "4":
+        return "exit"
+    else:
+        print("❌ Неверный выбор!")
+        return "invalid"

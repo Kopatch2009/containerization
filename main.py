@@ -5,6 +5,7 @@ import os
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 import sys
 
+
 # Импортируем созданные модули
 from control_version import VersionControlService
 from cus_exp import VersionControlBotExtension
@@ -145,16 +146,6 @@ async def async_main():
         elif mode == "invalid":
             continue
 
-def resource_path(relative_path):
-    """ Получить абсолютный путь к ресурсу. Работает и для разработки, и для собранного EXE. """
-    try:
-        # PyInstaller создает временную папку и хранит путь к ней в _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        # Если мы не в собранном exe, то base_path - это папка с текущим скриптом
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
 
 def main():
     """Синхронная точка входа"""
